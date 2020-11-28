@@ -116,14 +116,34 @@ app.get("/employee", (req, res) => {
     fs.readFile("templates/employeeLogin.html", (err, data) => {
         res.writeHead(200, { "Content-Type" : "text/html"});
         res.write(data);
+        var loginFail = url.parse(req.url, true).query.error;
+        if(loginFail === 'true') {
+            res.write('<h2 style="text-align:center;color:red">');
+            res.write("Incorrect Email or Password");
+            res.write('</h2>');
+        }
         res.end();
     });
 });
 
 // Employee Results Page
 app.get("/results", (req, res) => {
-    res.write("results");
-    res.end();
+    //Checks if login information is correct
+    var q = url.parse(req.url, true);
+    var qdata = q.query;
+    var sql = `SELECT COUNT(*) FROM Employee WHERE
+        email="` + qdata.email + `" AND passcode="`
+        + qdata.password + '"';
+    con.query(sql, function(err, result) {
+        var entryPresent = result[0]['COUNT(*)'];
+        if(!entryPresent) {
+            res.redirect("/employee?error=true");
+        }
+        else {
+            res.write("results");
+        }
+        res.end();
+    });
 });
 
 // Lab Login
@@ -131,14 +151,34 @@ app.get("/lablogin", (req, res) => {
     fs.readFile("templates/labLogin.html", (err,data) => {
         res.writeHead(200, { "Content-Type" : "text/html" });
         res.write(data);
+        var loginFail = url.parse(req.url, true).query.error;
+        if(loginFail === 'true') {
+            res.write('<h2 style="text-align:center;color:red">');
+            res.write("Incorrect LabID or Password");
+            res.write('</h2>');
+        }
         res.end();
     });
 });
 
 // Lab Home
 app.get("/labhome", (req, res) => {
-    res.write("Lab Home");
-    res.end();
+    //Checks if login information is correct
+    var q = url.parse(req.url, true);
+    var qdata = q.query;
+    var sql = `SELECT COUNT(*) FROM LabEmployee WHERE
+        labID="` + qdata.id + `" AND password="`
+        + qdata.password + '"';
+    con.query(sql, function(err, result) {
+        var entryPresent = result[0]['COUNT(*)'];
+        if(!entryPresent) {
+            res.redirect("/lablogin?error=true");
+        }
+        else {
+            res.write("Lab Home");
+        }
+        res.end();
+    });
 });
 
 // Pool Mapping
