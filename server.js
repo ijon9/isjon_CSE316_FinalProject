@@ -128,8 +128,11 @@ app.get("/results", (req, res) => {
 
 // Lab Login
 app.get("/lablogin", (req, res) => {
-    res.write("Lab Login");
-    res.end();
+    fs.readFile("templates/labLogin.html", (err,data) => {
+        res.writeHead(200, { "Content-Type" : "text/html" });
+        res.write(data);
+        res.end();
+    });
 });
 
 // Lab Home
