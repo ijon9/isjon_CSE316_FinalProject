@@ -1,0 +1,15 @@
+body {
+    background-color: rgb(245, 172, 164);
+}
+
+.redBox {
+    background-color: rgb(199, 0, 0);
+    text-align: center;
+    padding: 1px;
+    border: 2px solid black;
+}
+
+.button {
+    margin: auto;
+    width: 80%;
+}

@@ -100,3 +100,61 @@ con.connect(function (err) {
     //     console.log("Table created");
     // }); 
 });
+
+// Routes
+// Home
+app.get("/", (req, res) => {
+    fs.readFile("templates/index.html", (err, data) => {
+        res.writeHead(200, { "Content-Type" : "text/html" });
+        res.write(data);
+        res.end();
+    });
+});
+
+// Employee Login Page for Results
+app.get("/employee", (req, res) => {
+    fs.readFile("templates/employeeLogin.html", (err, data) => {
+        res.writeHead(200, { "Content-Type" : "text/html"});
+        res.write(data);
+        res.end();
+    });
+});
+
+// Employee Results Page
+app.get("/results", (req, res) => {
+    res.write("results");
+    res.end();
+});
+
+// Lab Login
+app.get("/lablogin", (req, res) => {
+    res.write("Lab Login");
+    res.end();
+});
+
+// Lab Home
+app.get("/labhome", (req, res) => {
+    res.write("Lab Home");
+    res.end();
+});
+
+// Pool Mapping
+app.get("/pool", (req, res) => {
+    res.write("Pool Mapping");
+    res.end();
+});
+
+// Well Testing
+app.get("/well", (req, res) => {
+    res.write("Well Testing");
+    res.end();
+});
+
+// Test Collection Page
+app.get("/test", (req, res) => {
+    res.write("Test Collection");
+    res.end();
+});
+
+port = process.env.PORT || 3000
+app.listen(port, () => { console.log('server started!') });
