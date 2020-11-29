@@ -162,7 +162,7 @@ app.get("/results", (req, res) => {
             res.redirect("/employee?error=true");
         }
         else {
-            res.write("results");
+            res.write("Results");
             // Clears the CurrentUser table and 
             // Loads the current Employee into the table
             con.query("TRUNCATE TABLE CurrentUser", (err, result) => {
@@ -275,11 +275,31 @@ app.get("/test", (req, res) => {
                 res.writeHead(200, {"Content-Type" : "text/html"});
                 res.write(data);
                 // Print table of tests
-                // Print LabID
-                res.write('<h2 style="text-align:center">');
-                res.write("Lab ID: " + currUser);
-                res.write('</h2>');
-                res.end();
+                res.write(`<br><table style="margin:auto;text-align:center" 
+                    cellspacing=0 border="1">`);
+                sql = `SELECT employeeID,testBarcode FROM EmployeeTest WHERE collectedBy=`+currUser;
+                con.query(sql, (err, result) => {
+                    // Table heading
+                    res.write('<tr>');
+                    res.write('<th> EmployeeID </th>');
+                    res.write('<th> Test Barcode </th>');
+                    res.write('</tr>');
+                    // Table rows
+                    result.forEach(row => {
+                        const eID = row['employeeID'];
+                        const bcode = row['testBarcode'];
+                        res.write("<tr>");
+                        res.write('<td>' + eID + '</td>');
+                        res.write('<td>' + bcode + '</td>');
+                        res.write('</tr>');
+                    });
+                    res.write('</table>');
+                    // Print LabID
+                    res.write('<h2 style="text-align:center">');
+                    res.write("Lab ID: " + currUser);
+                    res.write('</h2>');
+                    res.end();
+                });
             }
         });
     });
