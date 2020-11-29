@@ -99,6 +99,21 @@ con.connect(function (err) {
     //     if(err) throw err;
     //     console.log("Table created");
     // }); 
+    // Create table CurrentUser
+    // var sql = `CREATE TABLE CurrentUser(
+    //     employeeID VARCHAR(50),
+    //     labID VARCHAR(50),
+    //     FOREIGN KEY(employeeID) REFERENCES Employee(employeeID),
+    //     FOREIGN KEY(labID) REFERENCES LabEmployee(labID)
+    // )`;
+    // con.query(sql, function(err, result) {
+    //     if(err) throw err;
+    //     console.log("Table created");
+    // });
+    // Truncate CurrentUser
+    con.query('TRUNCATE TABLE CurrentUser', function(err, result) {
+        if(err) throw err;
+    });
 });
 
 // Routes
@@ -131,16 +146,27 @@ app.get("/results", (req, res) => {
     //Checks if login information is correct
     var q = url.parse(req.url, true);
     var qdata = q.query;
-    var sql = `SELECT COUNT(*) FROM Employee WHERE
+    var sql = `SELECT COUNT(*),employeeID FROM Employee WHERE
         email="` + qdata.email + `" AND passcode="`
         + qdata.password + '"';
     con.query(sql, function(err, result) {
+        if (err) throw err;
         var entryPresent = result[0]['COUNT(*)'];
         if(!entryPresent) {
             res.redirect("/employee?error=true");
         }
         else {
             res.write("results");
+            // Clears the CurrentUser table and 
+            // Loads the current Employee into the table
+            con.query("TRUNCATE TABLE CurrentUser", function(err, result) {
+                if(err) throw err;
+            });
+            sql = `INSERT INTO CurrentUser VALUES(`
+                + '"' + result[0]['employeeID'] + '", NULL' + `)`;
+            con.query(sql, function(err, result) {
+                if(err) throw err;
+            });
         }
         res.end();
     });
@@ -163,22 +189,40 @@ app.get("/lablogin", (req, res) => {
 
 // Lab Home
 app.get("/labhome", (req, res) => {
-    //Checks if login information is correct
-    var q = url.parse(req.url, true);
-    var qdata = q.query;
-    var sql = `SELECT COUNT(*) FROM LabEmployee WHERE
-        labID="` + qdata.id + `" AND password="`
-        + qdata.password + '"';
-    con.query(sql, function(err, result) {
-        var entryPresent = result[0]['COUNT(*)'];
-        if(!entryPresent) {
-            res.redirect("/lablogin?error=true");
-        }
-        else {
-            res.write("Lab Home");
-        }
-        res.end();
-    });
+    fs.readFile("templates/labHome.html", (err,data) => {
+        //Checks if login information is correct
+        var q = url.parse(req.url, true);
+        var qdata = q.query;
+        var sql = `SELECT COUNT(*) FROM LabEmployee WHERE
+            labID="` + qdata.id + `" AND password="`
+            + qdata.password + '"';
+        con.query(sql, function(err, result) {
+            if (err) throw err;
+            var entryPresent = result[0]['COUNT(*)'];
+            if(!entryPresent) {
+                res.redirect("/lablogin?error=true");
+            }
+            else {
+                // Load the lab home webpage 
+                res.writeHead(200, { "Content-Type" : "text/html" });
+                res.write(data+'<br>');
+                res.write('<h2 style="text-align:center">');
+                res.write("LabID: " + qdata.id);
+                res.write('</h2>');
+                // Clears the CurrentUser table and
+                // Loads the current lab employee into the table
+                con.query("TRUNCATE TABLE CurrentUser", function(err, result) {
+                    if(err) throw err;
+                });
+                sql = `INSERT INTO CurrentUser VALUES(`
+                    + 'NULL, "' + qdata.id + `")`;
+                con.query(sql, function(err, result) {
+                    if(err) throw err;
+                });
+            }
+            res.end();
+        });
+    })
 });
 
 // Pool Mapping
@@ -195,8 +239,26 @@ app.get("/well", (req, res) => {
 
 // Test Collection Page
 app.get("/test", (req, res) => {
-    res.write("Test Collection");
-    res.end();
+    fs.readFile("templates/testCollection.html", (err, data) => {
+        // Get the current lab employee that is logged in
+        con.query('SELECT labID FROM CurrentUser', (err, result) => {
+            var currUser = result[0];//['labID'];
+            if(currUser === undefined) {
+                res.redirect("/");
+            }
+            else {
+                res.writeHead(200, { "Content-Type" : "text/html" });
+                res.write(data);
+                currUser = currUser['labID'];
+                if(currUser !== null) {
+                    res.write('<h2 style="text-align:center">');
+                    res.write('Lab ID: ' + currUser);
+                    res.write('</h2>');
+                }
+                res.end();
+            }
+        });
+    });
 });
 
 port = process.env.PORT || 3000
