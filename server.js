@@ -15,7 +15,7 @@ con.connect(function (err) {
     if (err) throw err;
     console.log("Connected!");
     // Database creation
-    // con.query("CREATE DATABASE mydb", function(err, result) {
+    // con.query("CREATE DATABASE mydb", (err, result) => {
     //     if(err) throw err;
     //     console.log("Database created");
     // });
@@ -29,7 +29,7 @@ con.connect(function (err) {
     //     PRIMARY KEY(employeeID),
     //     UNIQUE(email)
     // )`;
-    // con.query(sql, function(err, result) {
+    // con.query(sql, (err, result) => {
     //     if(err) throw err;
     //     console.log("Table created");
     // });
@@ -39,7 +39,7 @@ con.connect(function (err) {
     //     password VARCHAR(50),
     //     PRIMARY KEY(labID)
     // )`;
-    // con.query(sql, function(err, result) {
+    // con.query(sql, (err, result) => {
     //     if(err) throw err;
     //     console.log("Table created");
     // });
@@ -48,7 +48,7 @@ con.connect(function (err) {
     //     poolBarcode VARCHAR(50),
     //     PRIMARY KEY(poolBarcode)
     // )`;
-    // con.query(sql, function(err, result) {
+    // con.query(sql, (err, result) => {
     //     if(err) throw err;
     //     console.log("Table created");
     // });
@@ -57,7 +57,7 @@ con.connect(function (err) {
     //     wellBarcode VARCHAR(50),
     //     PRIMARY KEY(wellBarcode)
     // )`;
-    // con.query(sql, function(err, result) {
+    // con.query(sql, (err, result) => {
     //     if(err) throw err;
     //     console.log("Table created");
     // });
@@ -71,7 +71,7 @@ con.connect(function (err) {
     //     FOREIGN KEY(employeeID) REFERENCES Employee(employeeID),
     //     FOREIGN KEY(collectedBy) REFERENCES LabEmployee(labID)
     //  )`;
-    // con.query(sql, function(err, result) {
+    // con.query(sql, (err, result) => {
     //     if(err) throw err;
     //     console.log("Table created");
     // });
@@ -82,7 +82,7 @@ con.connect(function (err) {
     //     FOREIGN KEY(testBarcode) REFERENCES EmployeeTest(testBarcode),
     //     FOREIGN KEY(poolBarcode) REFERENCES Pool(poolBarcode)
     // )`;
-    // con.query(sql, function(err, result) {
+    // con.query(sql, (err, result) => {
     //     if(err) throw err;
     //     console.log("Table created");
     // });
@@ -95,7 +95,7 @@ con.connect(function (err) {
     //     result VARCHAR(20),
     //     FOREIGN KEY(poolBarcode) REFERENCES Pool(poolBarcode)
     // )`;
-    // con.query(sql, function(err, result) {
+    // con.query(sql, (err, result) => {
     //     if(err) throw err;
     //     console.log("Table created");
     // }); 
@@ -106,12 +106,12 @@ con.connect(function (err) {
     //     FOREIGN KEY(employeeID) REFERENCES Employee(employeeID),
     //     FOREIGN KEY(labID) REFERENCES LabEmployee(labID)
     // )`;
-    // con.query(sql, function(err, result) {
+    // con.query(sql, (err, result) => {
     //     if(err) throw err;
     //     console.log("Table created");
     // });
     // Truncate CurrentUser
-    con.query('TRUNCATE TABLE CurrentUser', function(err, result) {
+    con.query('TRUNCATE TABLE CurrentUser', (err, result) => {
         if(err) throw err;
     });
 });
@@ -122,6 +122,12 @@ app.get("/", (req, res) => {
     fs.readFile("templates/index.html", (err, data) => {
         res.writeHead(200, { "Content-Type" : "text/html" });
         res.write(data);
+        var loggedIn = url.parse(req.url, true).query.error;
+        if(loggedIn === 'true') {
+            res.write('<h2 style="text-align:center;color:red">');
+            res.write("You must be logged in to access the desired webpage");
+            res.write('</h2>');
+        }
         res.end();
     });
 });
@@ -149,7 +155,7 @@ app.get("/results", (req, res) => {
     var sql = `SELECT COUNT(*),employeeID FROM Employee WHERE
         email="` + qdata.email + `" AND passcode="`
         + qdata.password + '"';
-    con.query(sql, function(err, result) {
+    con.query(sql, (err, result) => {
         if (err) throw err;
         var entryPresent = result[0]['COUNT(*)'];
         if(!entryPresent) {
@@ -159,12 +165,12 @@ app.get("/results", (req, res) => {
             res.write("results");
             // Clears the CurrentUser table and 
             // Loads the current Employee into the table
-            con.query("TRUNCATE TABLE CurrentUser", function(err, result) {
+            con.query("TRUNCATE TABLE CurrentUser", (err, result) => {
                 if(err) throw err;
             });
             sql = `INSERT INTO CurrentUser VALUES(`
                 + '"' + result[0]['employeeID'] + '", NULL' + `)`;
-            con.query(sql, function(err, result) {
+            con.query(sql, (err, result) => {
                 if(err) throw err;
             });
         }
@@ -196,31 +202,31 @@ app.get("/labhome", (req, res) => {
         var sql = `SELECT COUNT(*) FROM LabEmployee WHERE
             labID="` + qdata.id + `" AND password="`
             + qdata.password + '"';
-        con.query(sql, function(err, result) {
+        con.query(sql, (err, result) => {
             if (err) throw err;
             var entryPresent = result[0]['COUNT(*)'];
             if(!entryPresent) {
                 res.redirect("/lablogin?error=true");
             }
             else {
-                // Load the lab home webpage 
-                res.writeHead(200, { "Content-Type" : "text/html" });
-                res.write(data+'<br>');
-                res.write('<h2 style="text-align:center">');
-                res.write("LabID: " + qdata.id);
-                res.write('</h2>');
                 // Clears the CurrentUser table and
                 // Loads the current lab employee into the table
-                con.query("TRUNCATE TABLE CurrentUser", function(err, result) {
+                con.query("TRUNCATE TABLE CurrentUser", (err, result) => {
                     if(err) throw err;
                 });
                 sql = `INSERT INTO CurrentUser VALUES(`
                     + 'NULL, "' + qdata.id + `")`;
-                con.query(sql, function(err, result) {
+                con.query(sql, (err, result) => {
                     if(err) throw err;
                 });
+                // Load the lab home webpage 
+                res.writeHead(200, {"Content-Type" : "text/html"});
+                res.write(data);
+                res.write('<h2 style="text-align:center">');
+                res.write("Lab ID: " + qdata.id);
+                res.write('</h2>');
+                res.end();
             }
-            res.end();
         });
     })
 });
@@ -241,20 +247,38 @@ app.get("/well", (req, res) => {
 app.get("/test", (req, res) => {
     fs.readFile("templates/testCollection.html", (err, data) => {
         // Get the current lab employee that is logged in
+        // and print the html template
         con.query('SELECT labID FROM CurrentUser', (err, result) => {
-            var currUser = result[0];//['labID'];
+            if (err) throw err;
+            var currUser = result[0];
             if(currUser === undefined) {
-                res.redirect("/");
+                res.redirect("/?error=true");
+            }
+            else if(currUser['labID'] === null) {
+                res.redirect("/?error=true");
             }
             else {
-                res.writeHead(200, { "Content-Type" : "text/html" });
-                res.write(data);
+                // If a new test has been added, add the corresponding
+                // row into the database
                 currUser = currUser['labID'];
-                if(currUser !== null) {
-                    res.write('<h2 style="text-align:center">');
-                    res.write('Lab ID: ' + currUser);
-                    res.write('</h2>');
+                var q = url.parse(req.url, true);
+                var qdata = q.query;
+                const employeeId = qdata.id;
+                if(employeeId !== undefined) {
+                    const barcode = qdata.barcode;
+                    var sql = `INSERT INTO EmployeeTest VALUES("` +
+                        barcode + '", "' + employeeId + '", "' + 
+                        '2020-11-28 09:30:00", "' + currUser +`")`;
+                    con.query(sql, (err, result) => {});
                 }
+                // Print the page
+                res.writeHead(200, {"Content-Type" : "text/html"});
+                res.write(data);
+                // Print table of tests
+                // Print LabID
+                res.write('<h2 style="text-align:center">');
+                res.write("Lab ID: " + currUser);
+                res.write('</h2>');
                 res.end();
             }
         });
