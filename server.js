@@ -235,6 +235,11 @@ app.get("/labhome", (req, res) => {
 app.get("/pool", (req, res) => {
     res.write("Pool Mapping");
     res.end();
+    // Create a database called CurrentPool which has a list of test barcodes currently selected
+    // Have a form including a text box and submit button to allow the user to add courses
+    // Display the currently selected tests in a list
+    // if there is no query or if the submit pool button is pressed, truncate the currentPool table
+    // Display a table which lists all the pools and the test barcodes in each pool
 });
 
 // Well Testing
@@ -269,13 +274,24 @@ app.get("/test", (req, res) => {
                     var sql = `INSERT INTO EmployeeTest VALUES("` +
                         barcode + '", "' + employeeId + '", "' + 
                         '2020-11-28 09:30:00", "' + currUser +`")`;
-                    con.query(sql, (err, result) => {});
+                    con.query(sql, (err, result) => {
+                        if(err) {
+                            res.write('<p style="color:red;text-align:center">Invalid EmployeeID or Test Barcode</p><br>');
+                        }
+                    });
+                }
+                // If a test has been deleted, delete the corresponding row from the database
+                const bcodeToDelete = qdata.bcode;
+                if(bcodeToDelete !== undefined) {
+                    var sql = 'DELETE FROM EmployeeTest WHERE testBarcode="'+bcodeToDelete+'"';
+                    con.query(sql, (err, result) => { if(err) throw error; });
                 }
                 // Print the page
                 res.writeHead(200, {"Content-Type" : "text/html"});
                 res.write(data);
                 // Print table of tests
-                res.write(`<br><table style="margin:auto;text-align:center" 
+                res.write('<form style="text-align:center" action="/test">');
+                res.write(`<br><table style="margin:auto;text-align:center;width:20%"
                     cellspacing=0 border="1">`);
                 sql = `SELECT employeeID,testBarcode FROM EmployeeTest WHERE collectedBy=`+currUser;
                 con.query(sql, (err, result) => {
@@ -289,11 +305,16 @@ app.get("/test", (req, res) => {
                         const eID = row['employeeID'];
                         const bcode = row['testBarcode'];
                         res.write("<tr>");
-                        res.write('<td>' + eID + '</td>');
+                        res.write('<td>');
+                        res.write('<input type="radio" id="bcode" name="bcode" value="'+bcode+'">');
+                        res.write('<label for="bcode">'+eID+'</label>');
+                        res.write('</td>');
                         res.write('<td>' + bcode + '</td>');
                         res.write('</tr>');
                     });
-                    res.write('</table>');
+                    res.write('</table><br>');
+                    res.write('<input type="submit" value="Delete">');
+                    res.write('</form>');
                     // Print LabID
                     res.write('<h2 style="text-align:center">');
                     res.write("Lab ID: " + currUser);
