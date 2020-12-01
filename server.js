@@ -5,6 +5,7 @@ const url = require('url');
 
 // DB Connection
 var mysql = require('mysql');
+const { isBuffer } = require('util');
 var con = mysql.createConnection({
     host: "localhost",
     user: "root",
@@ -162,7 +163,6 @@ app.get("/results", (req, res) => {
             res.redirect("/employee?error=true");
         }
         else {
-            res.write("Results");
             // Clears the CurrentUser table and 
             // Loads the current Employee into the table
             con.query("TRUNCATE TABLE CurrentUser", (err, result) => {
@@ -173,8 +173,12 @@ app.get("/results", (req, res) => {
             con.query(sql, (err, result) => {
                 if(err) throw err;
             });
+            fs.readFile("templates/employeeResults.html", (err, data) => {
+                res.writeHead(200, { "Content-Type" : "text/html"});
+                res.write(data);
+                res.end();
+            });
         }
-        res.end();
     });
 });
 
@@ -233,13 +237,77 @@ app.get("/labhome", (req, res) => {
 
 // Pool Mapping
 app.get("/pool", (req, res) => {
-    res.write("Pool Mapping");
-    res.end();
     // Create a database called CurrentPool which has a list of test barcodes currently selected
     // Have a form including a text box and submit button to allow the user to add courses
-    // Display the currently selected tests in a list
-    // if there is no query or if the submit pool button is pressed, truncate the currentPool table
+    // Display the currently selected tests in a list with a delete button next to each one, which is part of the same form
+    // if there is no query or if the submit pool button is pressed, add each test in the CurrentPool table into
+    // the pool mapping table and truncate the currentPool table
     // Display a table which lists all the pools and the test barcodes in each pool
+    // Look at the query to see what to display
+    var q = url.parse(req.url, true);
+    var qdata = q.query;
+    // Truncate table CurrentPool
+    // con.query('TRUNCATE TABLE CurrentPool', (err, result) => {
+    //     if(err) throw err;
+    // });
+    con.query('SELECT labID FROM CurrentUser', (err, result) => {
+        if (err) throw err;
+        var currUser = result[0];
+        if(currUser === undefined) {
+            res.redirect("/?error=true");
+        }
+        else if(currUser['labID'] === null) {
+            res.redirect("/?error=true");
+        }
+        else {
+            currUser = currUser['labID'];
+            fs.readFile("templates/poolMapping.html", (err, data) => {
+                res.writeHead(200, {"Content-Type" : "text/html"});
+                res.write(data);
+                // Display tests in currentPool
+                con.query('SELECT * FROM CurrentPool', (err, result) => {
+                    if(err) throw err;
+                    result.forEach(row => {
+                        const bcode = row['testBarcode'];
+                        res.write('<li>' + bcode + ' <input type="submit" name="' + bcode +
+                            '" value="Delete"></li>');
+                    });
+                    res.write('</ul><br><input type="text" name="addTest"> <input type="submit" value="Add Test"><br><br>');
+                    res.write('<input type="submit" name="addPool" value="Add Pool">');
+                    res.write('</form>');
+                    // Display pool tests for the current lab employee
+                    var sql = `SELECT DISTINCT poolBarcode FROM PoolMap P, EmployeeTest E
+                        WHERE E.testBarcode=P.testBarcode AND E.collectedBy="` + currUser +'"';
+                    con.query(sql, (err, result) => {
+                        if(err) throw err;
+                        res.write('<table>');
+                        // Table Heading
+                        res.write('<tr>');
+                        res.write('<th> Pool Barcode </th>');
+                        res.write('<th> Test Barcodes </th>');
+                        res.write('</tr>');
+                        // For each poolBarcode, collect all of the TestBarcodes within that pool
+                        // Table Rows
+                        result.forEach(row => {
+                            const pbcode = row['poolBarcode'];
+                            con.query(`SELECT testBarcode FROM PoolMap WHERE poolBarcode="`+pbcode+'"', (err, result) => {
+                                res.write('<tr>');
+                                res.write('<td>' + pbcode + '</td>');
+                                res.write('<td>');
+                                // WRITE CODE TO PRINT OUT THE TEST BARCODES 
+                                res.write('</td>');
+                                res.write('</tr>');
+                            })
+                        });
+                        res.write('</table>');
+                        // PRINT THE CURRENT LAB EMPLOYEE
+                        res.write('</body></html>');
+                        res.end();
+                    });            
+                });
+            });
+        }
+    });
 });
 
 // Well Testing
