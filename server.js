@@ -5,7 +5,6 @@ const url = require('url');
 
 // DB Connection
 var mysql = require('mysql');
-const { isBuffer } = require('util');
 var con = mysql.createConnection({
     host: "localhost",
     user: "root",
@@ -244,12 +243,6 @@ app.get("/pool", (req, res) => {
     // the pool mapping table and truncate the currentPool table
     // Display a table which lists all the pools and the test barcodes in each pool
     // Look at the query to see what to display
-    var q = url.parse(req.url, true);
-    var qdata = q.query;
-    // Truncate table CurrentPool
-    // con.query('TRUNCATE TABLE CurrentPool', (err, result) => {
-    //     if(err) throw err;
-    // });
     con.query('SELECT labID FROM CurrentUser', (err, result) => {
         if (err) throw err;
         var currUser = result[0];
@@ -264,51 +257,124 @@ app.get("/pool", (req, res) => {
             fs.readFile("templates/poolMapping.html", (err, data) => {
                 res.writeHead(200, {"Content-Type" : "text/html"});
                 res.write(data);
-                // Display tests in currentPool
-                con.query('SELECT * FROM CurrentPool', (err, result) => {
-                    if(err) throw err;
-                    result.forEach(row => {
-                        const bcode = row['testBarcode'];
-                        res.write('<li>' + bcode + ' <input type="submit" name="' + bcode +
-                            '" value="Delete"></li>');
+                var q = url.parse(req.url, true);
+                var qdata = q.query;
+                // If addPool !== "", add all of the test barcodes into pool map with the specified pool
+                if(qdata.addPool !== "" && qdata.addPool !== undefined) {
+                    const pool = qdata.addPoolBcode;
+                    con.query('INSERT INTO pool VALUES("' + pool + '")', (err, result) => {
+                        if(err) { 
+                            res.write('<h2 style="color:red"> Invalid Pool Barcode </h2>')
+                            displayPoolMapping(res, currUser);
+                        }
+                        else {
+                            con.query('SELECT testBarcode FROM CurrentPool', (err, result) => {
+                                if(err) throw err;
+                                result.forEach(row => {
+                                    const test = row['testBarcode'];
+                                    var sql = `INSERT INTO PoolMap VALUES("`+test+'", "'+pool+'")';
+                                    con.query(sql, (err, result) => {
+                                        if(err) throw err;
+                                    });
+                                });
+                                // Truncate table CurrentPool
+                                con.query('TRUNCATE TABLE CurrentPool', (err, result) => {
+                                    if(err) throw err;
+                                    displayPoolMapping(res, currUser);
+                                });
+                            });
+                        }
                     });
-                    res.write('</ul><br><input type="text" name="addTest"> <input type="submit" value="Add Test"><br><br>');
-                    res.write('<input type="submit" name="addPool" value="Add Pool">');
-                    res.write('</form>');
-                    // Display pool tests for the current lab employee
-                    var sql = `SELECT DISTINCT poolBarcode FROM PoolMap P, EmployeeTest E
-                        WHERE E.testBarcode=P.testBarcode AND E.collectedBy="` + currUser +'"';
+                }
+                // If addTest === undefined, truncate the CurrentPool Table
+                else if(qdata.addTest === undefined && (qdata.addPool === "" || qdata.addPool === undefined)) {
+                    // Truncate table CurrentPool
+                    con.query('TRUNCATE TABLE CurrentPool', (err, result) => {
+                        if(err) throw err;
+                    });
+                    displayPoolMapping(res, currUser);
+                }
+                else if(qdata.addTest !== undefined) {
+                    // Insert into CurrentPool the current test entered, only if that test is given by the current lab employee
+                    const testBcode = qdata.addTestBcode;
+                    var sql = `SELECT COUNT(*) FROM EmployeeTest WHERE collectedBy="`+currUser+'" AND testBarcode="'+testBcode+'"';
                     con.query(sql, (err, result) => {
                         if(err) throw err;
-                        res.write('<table>');
-                        // Table Heading
-                        res.write('<tr>');
-                        res.write('<th> Pool Barcode </th>');
-                        res.write('<th> Test Barcodes </th>');
-                        res.write('</tr>');
-                        // For each poolBarcode, collect all of the TestBarcodes within that pool
-                        // Table Rows
-                        result.forEach(row => {
-                            const pbcode = row['poolBarcode'];
-                            con.query(`SELECT testBarcode FROM PoolMap WHERE poolBarcode="`+pbcode+'"', (err, result) => {
-                                res.write('<tr>');
-                                res.write('<td>' + pbcode + '</td>');
-                                res.write('<td>');
-                                // WRITE CODE TO PRINT OUT THE TEST BARCODES 
-                                res.write('</td>');
-                                res.write('</tr>');
-                            })
-                        });
-                        res.write('</table>');
-                        // PRINT THE CURRENT LAB EMPLOYEE
-                        res.write('</body></html>');
-                        res.end();
-                    });            
-                });
+                        if(result[0]['COUNT(*)'] !== 1) {
+                            res.write('<h2 style="color:red">Invalid Test Barcode</h2>')
+                            displayPoolMapping(res, currUser);
+                        }
+                        else {
+                            con.query('INSERT INTO CurrentPool VALUES("'+testBcode+'")', (err, result) => {
+                                if(err) throw error;
+                                displayPoolMapping(res, currUser);
+                            });
+                        }
+                    });
+                }
             });
         }
     });
 });
+
+function displayPoolMapping(res, currUser) {
+    // Display tests in currentPool
+    con.query('SELECT * FROM CurrentPool', (err, result) => {
+        if(err) throw err;
+        result.forEach(row => {
+            const bcode = row['testBarcode'];
+            res.write('<li>' + bcode + ' <input type="submit" name="' + bcode +
+                '" value="Delete"></li>');
+        });
+        res.write('</ul><input type="text" name="addTestBcode"> <input type="submit" name="addTest" value="Add Test"><br><br>');
+        res.write('<input type="submit" name="addPool" value="Add Pool"><br>');
+        res.write('</form>');
+        // Display pool tests for the current lab employee
+        var sql = `SELECT poolBarcode,P.testBarcode FROM PoolMap P, EmployeeTest E
+            WHERE E.testBarcode=P.testBarcode AND E.collectedBy="` + currUser +'"';
+        con.query(sql, (err, result) => {
+            if(err) throw err;
+            res.write(`<br><br><table style="margin:auto;text-align:center;width:20%"
+            cellspacing=0 border="1">`);
+            // Table Heading
+            res.write('<tr>');
+            res.write('<th> Pool Barcode </th>');
+            res.write('<th> Test Barcodes </th>');
+            res.write('</tr>');
+            // Add each row
+            result.forEach(row => {
+                const pbcode = row['poolBarcode'];
+                const tbcode = row['testBarcode'];
+                res.write('<tr>');
+                res.write('<td>'+pbcode+'</td>');
+                res.write('<td>'+tbcode+'</td>');
+                res.write('</tr>');
+            });
+            // For each poolBarcode, collect all of the TestBarcodes within that pool
+            // Table Rows
+            // result.forEach(row => {
+            //     const pbcode = row['poolBarcode'];
+            //     con.query(`SELECT testBarcode FROM PoolMap WHERE poolBarcode="`+pbcode+'"', (err, result) => {
+            //         res.write('<tr>');
+            //         res.write('<td>' + pbcode + '</td>');
+            //         res.write('<td>');
+            //         // Print each test barcode associated with the pool
+            //         for (let i = 0; i < result.length; i++) {
+            //             const bcode = result[i]['testBarcode'];
+            //             if(i === result.length-1) { res.write(bcode); }
+            //             else { res.write(bcode+', '); }
+            //         }
+            //         res.write('</td>');
+            //         res.write('</tr>');
+            //     })
+            // });
+            res.write('</table>');
+            res.write('<h2 style="text-align:center"> Lab ID: ' + currUser + '</h2>');
+            res.write('</body></html>');
+            res.end();
+        });            
+    });
+}
 
 // Well Testing
 app.get("/well", (req, res) => {
