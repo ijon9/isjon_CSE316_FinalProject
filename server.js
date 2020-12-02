@@ -323,15 +323,15 @@ function displayPoolMapping(res, currUser) {
         if(err) throw err;
         result.forEach(row => {
             const bcode = row['testBarcode'];
-            res.write('<li>' + bcode + ' <input type="submit" name="' + bcode +
-                '" value="Delete"></li>');
+            res.write('<li>' + bcode + '</li>');
         });
-        res.write('</ul><input type="text" name="addTestBcode"> <input type="submit" name="addTest" value="Add Test"><br><br>');
+        res.write(`</ul><input type="text" name="addTestBcode"> <input type="submit" name="addTest" value="Add Test">
+            <input type="submit" name="deleteTests" value="Delete Tests"><br><br>`);
         res.write('<input type="submit" name="addPool" value="Add Pool"><br>');
         res.write('</form>');
         // Display pool tests for the current lab employee
         var sql = `SELECT poolBarcode,P.testBarcode FROM PoolMap P, EmployeeTest E
-            WHERE E.testBarcode=P.testBarcode AND E.collectedBy="` + currUser +'"';
+            WHERE E.testBarcode=P.testBarcode AND E.collectedBy="` + currUser +'" ORDER BY poolBarcode';
         con.query(sql, (err, result) => {
             if(err) throw err;
             res.write(`<br><br><table style="margin:auto;text-align:center;width:20%"
@@ -341,38 +341,47 @@ function displayPoolMapping(res, currUser) {
             res.write('<th> Pool Barcode </th>');
             res.write('<th> Test Barcodes </th>');
             res.write('</tr>');
-            // Add each row
-            result.forEach(row => {
-                const pbcode = row['poolBarcode'];
-                const tbcode = row['testBarcode'];
+            // Add each row of test barcodes into one string
+            var curr = "";
+            var rowStr = "";
+            var pbcode;
+            var tbcode;
+            for (let i = 0; i < result.length; i++) {
+                const row = result[i];
+                pbcode = row['poolBarcode'];
+                tbcode = row['testBarcode'];
+                if(pbcode !== curr) {
+                    if(curr === "") {
+                        curr = pbcode;
+                    }
+                    else {
+                        // Add the list of test barcodes and pool barcodes to the table
+                        // Reset rowStr and update curr
+                        rowStr = rowStr.substring(0, rowStr.length-2);
+                        res.write('<tr>');
+                        res.write('<td>'+curr+'</td>');
+                        res.write('<td>'+rowStr+'</td>');
+                        res.write('</tr>');
+                        curr = pbcode;
+                        rowStr = "";
+                    }
+                }
+                // Add the next test barcode to rowStr 
+                rowStr += tbcode+', ';                
+            }
+            if(curr !== "") {
+                // Add the last row of test barcodes and pool barcode to the table
+                rowStr = rowStr.substring(0, rowStr.length-2);
                 res.write('<tr>');
-                res.write('<td>'+pbcode+'</td>');
-                res.write('<td>'+tbcode+'</td>');
+                res.write('<td>'+curr+'</td>');
+                res.write('<td>'+rowStr+'</td>');
                 res.write('</tr>');
-            });
-            // For each poolBarcode, collect all of the TestBarcodes within that pool
-            // Table Rows
-            // result.forEach(row => {
-            //     const pbcode = row['poolBarcode'];
-            //     con.query(`SELECT testBarcode FROM PoolMap WHERE poolBarcode="`+pbcode+'"', (err, result) => {
-            //         res.write('<tr>');
-            //         res.write('<td>' + pbcode + '</td>');
-            //         res.write('<td>');
-            //         // Print each test barcode associated with the pool
-            //         for (let i = 0; i < result.length; i++) {
-            //             const bcode = result[i]['testBarcode'];
-            //             if(i === result.length-1) { res.write(bcode); }
-            //             else { res.write(bcode+', '); }
-            //         }
-            //         res.write('</td>');
-            //         res.write('</tr>');
-            //     })
-            // });
+            }
             res.write('</table>');
             res.write('<h2 style="text-align:center"> Lab ID: ' + currUser + '</h2>');
             res.write('</body></html>');
             res.end();
-        });            
+        });
     });
 }
 
