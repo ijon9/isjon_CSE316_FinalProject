@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<head>
+    <title> COVID Testing </title>
+    <style>
+        .redBox {
+            background-color: rgb(210, 0, 0);
+            text-align: center;
+            padding: 1px;
+            border: 2px solid black;
+        }
+        form {
+            text-align:center;
+        }
+        ul {
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div style="height:90px" class="redBox">
+        <h1 style="height:17px"> Well Testing </h1>
+        <a href="/"> Return to Home </a>
+    </div>
+    <br><br>
+    <form action="/well">
+        <label for="addWellBcode">Well Barcode:</label> <input type="text" id="addWellBarcode" name="addWellBcode">  <br><br>
+        <label for="addPoolBcode">Pool Barcode:</label> <input type="text" id="addPoolBcode" name="addPoolBcode"> <br><br>
+        <label for="result">Result:</label>
+        <select name="result">
+            <option value="in progress">In Progress</option>
+            <option value="negative">Negative</option>
+            <option value="positive">Positive</option>
+        </select><br><br>
+        <input type="submit" name="command" value="Add">
+    </form>
+

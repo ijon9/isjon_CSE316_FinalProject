@@ -5,6 +5,7 @@ const url = require('url');
 
 // DB Connection
 var mysql = require('mysql');
+const { RSA_NO_PADDING } = require('constants');
 var con = mysql.createConnection({
     host: "localhost",
     user: "root",
@@ -93,7 +94,9 @@ con.connect(function (err) {
     //     testingStartTime DATETIME,
     //     testingEndTime DATETIME,
     //     result VARCHAR(20),
-    //     FOREIGN KEY(poolBarcode) REFERENCES Pool(poolBarcode)
+    //     FOREIGN KEY(poolBarcode) REFERENCES Pool(poolBarcode),
+    //     FOREIGN KEY(wellBarcode) REFERENCES Well(wellBarcode),
+    //     UNIQUE(wellBarcode)
     // )`;
     // con.query(sql, (err, result) => {
     //     if(err) throw err;
@@ -387,9 +390,137 @@ function displayPoolMapping(res, currUser) {
 
 // Well Testing
 app.get("/well", (req, res) => {
-    res.write("Well Testing");
-    res.end();
+    con.query('SELECT labID FROM CurrentUser', (err, result) => {
+        if (err) throw err;
+        var currUser = result[0];
+        if(currUser === undefined) {
+            res.redirect("/?error=true");
+        }
+        else if(currUser['labID'] === null) {
+            res.redirect("/?error=true");
+        }
+        else {
+            currUser = currUser['labID'];
+            var q = url.parse(req.url, true);
+            var qdata = q.query;
+            fs.readFile("templates/wellTesting.html", (err, data) => {
+                res.writeHead(200, {"Content-Type" : "text/html"});
+                res.write(data);
+                // If a new well test has been added, update the wellTesting table
+                if(qdata.command === "Add") {
+                    const poolBcode = qdata.addPoolBcode;
+                    const wellBcode = qdata.addWellBcode;
+                    var sql = 'INSERT INTO WellTesting VALUES("' +
+                        poolBcode + '", "' +
+                        wellBcode + '", ' +
+                        // Start and End Time
+                        '"2020-11-28 09:30:00", "2020-11-28 09:30:00", "' +
+                        qdata.result + '")';
+                    con.query(sql, (err) => {
+                        if(err) {
+                            res.write('<h2 style="text-align:center;color:red"> Invalid Well Barcode or Pool Barcode </h2>');
+                            displayWellTesting(res, currUser);
+                        }
+                        else {
+                            // Checks if the pool is associated with the current lab employee
+                            sql = 'SELECT COUNT(P.poolBarcode) FROM EmployeeTest E, PoolMap P, WellTesting W WHERE ' +
+                                'W.poolBarcode=P.poolBarcode AND P.testBarcode=E.testBarcode AND ' +
+                                'E.collectedBy="' + currUser + '"';
+                            con.query(sql, (err, result) => {
+                                if(err || result[0] === undefined || result[0]['COUNT(P.poolBarcode)'] === 0) {
+                                    // Delete the entry, and print an error message
+                                    con.query('DELETE FROM WellTesting WHERE poolBarcode='+poolBcode, (err) => {
+                                        res.write('<h2 style="text-align:center;color:red"> Sorry, Not Your Pool </h2>');
+                                    });
+                                }
+                                displayWellTesting(res, currUser);
+                            });
+                            
+                        }
+                    });
+                }
+                // If a well test is edited, update the corresponding entry
+                else if(qdata.command === "Edit") {
+                    var sql = 'UPDATE WellTesting SET result="' +
+                        qdata.change + '" WHERE wellBarcode="' +
+                        qdata.wellBcode + '"';
+                    con.query(sql, (err, result) => {
+                        if(err) {
+                            res.write('<h2 style="text-align:center;color:red"> Please Select a Well to Edit </h2>');
+                            displayWellTesting(res, currUser);
+                        }
+                        else { displayWellTesting(res, currUser); }
+                    });
+                }
+                // If a well test is deleted, delete the corresponding entry
+                else if(qdata.command === "Delete") {
+                    var sql = 'DELETE FROM WellTesting WHERE wellBarcode="'+
+                        qdata.wellBcode + '"';
+                    con.query(sql, (err, result) => {
+                        if(err) {
+                            res.write('<h2 style="text-align:center;color:red"> Please Select a Well to Delete </h2>');
+                            displayWellTesting(res, currUser);
+                        }
+                        else { displayWellTesting(res, currUser); }
+                    });
+                }
+                // Display all the entries in the WellTesting table
+                else {
+                    displayWellTesting(res, currUser);
+                }
+            });
+        }
+    });
 });
+
+// Prints WellTesting Table
+function displayWellTesting(res, currUser) {
+    // Query: Retrieve all the Well Barcodes, Pool Barcodes and Results
+    // which contain pools associated with the current user
+    // Put the rows into a table with checkboxes
+    var sql = `SELECT DISTINCT W.poolBarcode,wellBarcode,result FROM 
+        WellTesting W, PoolMap P, EmployeeTest E WHERE 
+        W.poolBarcode=P.poolBarcode AND P.testBarcode=E.testBarcode
+        AND E.collectedBy="` + currUser + '"'
+    con.query(sql, (err, result) => {
+        if(err) throw err;
+        res.write('<h2 style="text-align:center"> Well Tests </h2>');
+        res.write('<form action="/well">')
+        res.write(`<table style="margin:auto;text-align:center;width:20%"
+        cellspacing=0 border="1">`);
+        // Table Heading
+        res.write('<tr>');
+        res.write('<th> Well Barcode </th>');
+        res.write('<th> Pool Barcode </th>');
+        res.write('<th> Result </th>');
+        res.write('</tr>');
+        // Table Rows
+        result.forEach(row => {
+            const wBcode = row['wellBarcode'];
+            const pBcode = row['poolBarcode'];
+            const testResult = row['result'];
+            res.write('<tr>');
+            res.write(`<td><input type="radio" name="wellBcode"
+                value="`+wBcode+`"><label for="wellBcode">`+wBcode+`</label></td>`);
+            res.write('<td>'+pBcode+'</td>');
+            res.write('<td>'+testResult+'</td>');
+            res.write('</tr>');
+        });
+        // Table End
+        res.write('</table>');
+        res.write('<br><input type="submit" name="command" value="Edit"> ');
+        res.write(`<select name="change"> <option value="in progress">In Progress</option>
+            <option value="negative">Negative</option>
+            <option value="positive">Positive</option></select><br><br>`);
+        res.write('<input type="submit" name="command" value="Delete">');
+        res.write('</form>');
+        // Webpage End
+        res.write('<h2 style="text-align:center"> Lab ID: ' + currUser + '</h2>');
+        res.write('</body></html>');
+        res.end();
+    });
+}
+
 
 // Test Collection Page
 app.get("/test", (req, res) => {
