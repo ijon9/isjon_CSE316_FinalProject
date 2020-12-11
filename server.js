@@ -5,7 +5,6 @@ const url = require('url');
 
 // DB Connection
 var mysql = require('mysql');
-const { RSA_NO_PADDING } = require('constants');
 var con = mysql.createConnection({
     host: "localhost",
     user: "root",
@@ -170,15 +169,44 @@ app.get("/results", (req, res) => {
             con.query("TRUNCATE TABLE CurrentUser", (err, result) => {
                 if(err) throw err;
             });
+            const currUser = result[0]['employeeID'];
             sql = `INSERT INTO CurrentUser VALUES(`
-                + '"' + result[0]['employeeID'] + '", NULL' + `)`;
+                + '"' + currUser + '", NULL' + `)`;
             con.query(sql, (err, result) => {
                 if(err) throw err;
             });
             fs.readFile("templates/employeeResults.html", (err, data) => {
                 res.writeHead(200, { "Content-Type" : "text/html"});
                 res.write(data);
-                res.end();
+                // Collect all the test results and collection time for currUser
+                sql = `SELECT collectionTime, result FROM 
+                    EmployeeTest E, PoolMap P, WellTesting W WHERE
+                    E.testBarcode=P.testBarcode AND P.poolBarcode=W.poolBarcode AND
+                    employeeID="`+currUser+'"';
+                con.query(sql, (err, result) => {
+                    if(err) throw err;
+                    res.write(`<br><br><table style="margin:auto;text-align:center;width:20%"
+                    cellspacing=0 border="1">`);
+                    // Table Heading
+                    res.write('<tr>');
+                    res.write('<th> Collection Time </th>');
+                    res.write('<th> Result </th>');
+                    res.write('</tr>');
+                    // Table Rows
+                    result.forEach(row => {
+                        const cTime = row['collectionTime'];
+                        const tRes = row['result'];
+                        res.write('<tr>');
+                        res.write('<td>' + cTime + '</td>');
+                        res.write('<td>' + tRes + '</td>');
+                        res.write('</tr>');
+                    });
+                    // Table and WebPage End
+                    res.write('</table>');
+                    res.write('<h2 style="text-align:center"> Employee ID: ' + currUser + '</h2>');
+                    res.write('</body></html>');
+                    res.end();
+                });
             });
         }
     });
@@ -380,6 +408,7 @@ function displayPoolMapping(res, currUser) {
                 res.write('<td>'+rowStr+'</td>');
                 res.write('</tr>');
             }
+            // Table and WebPage End
             res.write('</table>');
             res.write('<h2 style="text-align:center"> Lab ID: ' + currUser + '</h2>');
             res.write('</body></html>');
@@ -447,9 +476,8 @@ app.get("/well", (req, res) => {
                     con.query(sql, (err, result) => {
                         if(err) {
                             res.write('<h2 style="text-align:center;color:red"> Please Select a Well to Edit </h2>');
-                            displayWellTesting(res, currUser);
                         }
-                        else { displayWellTesting(res, currUser); }
+                        displayWellTesting(res, currUser);
                     });
                 }
                 // If a well test is deleted, delete the corresponding entry
@@ -459,9 +487,8 @@ app.get("/well", (req, res) => {
                     con.query(sql, (err, result) => {
                         if(err) {
                             res.write('<h2 style="text-align:center;color:red"> Please Select a Well to Delete </h2>');
-                            displayWellTesting(res, currUser);
                         }
-                        else { displayWellTesting(res, currUser); }
+                        displayWellTesting(res, currUser);
                     });
                 }
                 // Display all the entries in the WellTesting table
@@ -564,7 +591,7 @@ app.get("/test", (req, res) => {
                 res.writeHead(200, {"Content-Type" : "text/html"});
                 res.write(data);
                 // Print table of tests
-                res.write('<form style="text-align:center" action="/test">');
+                // res.write('<form style="text-align:center" action="/test">');
                 res.write(`<br><table style="margin:auto;text-align:center;width:20%"
                     cellspacing=0 border="1">`);
                 sql = `SELECT employeeID,testBarcode FROM EmployeeTest WHERE collectedBy=`+currUser;
@@ -579,16 +606,13 @@ app.get("/test", (req, res) => {
                         const eID = row['employeeID'];
                         const bcode = row['testBarcode'];
                         res.write("<tr>");
-                        res.write('<td>');
-                        res.write('<input type="radio" id="bcode" name="bcode" value="'+bcode+'">');
-                        res.write('<label for="bcode">'+eID+'</label>');
-                        res.write('</td>');
+                        res.write('<td>'+eID+'</td>');
                         res.write('<td>' + bcode + '</td>');
                         res.write('</tr>');
                     });
-                    res.write('</table><br>');
-                    res.write('<input type="submit" value="Delete">');
-                    res.write('</form>');
+                    res.write('</table>');
+                    // res.write('<input type="submit" value="Delete">');
+                    // res.write('</form>');
                     // Print LabID
                     res.write('<h2 style="text-align:center">');
                     res.write("Lab ID: " + currUser);
